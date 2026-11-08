@@ -1,0 +1,16 @@
+================================
+          DART CHECKER
+================================
+
+1. New Game
+2. Game History
+3. Leaderboards
+4. Player Profiles
+5. Clubs
+6. Leagues
+7. Tournaments
+8. Exit
+
+================================
+
+

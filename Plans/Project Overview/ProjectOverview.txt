@@ -1,0 +1,126 @@
+Dart_Checker_Project
+
+Description:
+An app that can calculate and keep record of dart different dart games.
+The app has the ability to keep scores for short and long games for 
+multiple player profiles. Tournament games with clubs and leagues are 
+also playable on the app. 
+
+Brainstorm Ideas: 
+-Different players,
+-Score 301-short game, 
+-Score 501-long game,
+-Singles,
+-Doubles,
+-Triples,
+-Finish on a double,
+-Possible tournaments,
+-Different players,
+-Score 301-short game, 
+-Score 501-long game,
+-Singles,
+-Doubles,
+-Triples,
+-Finish on a double,
+-Tournaments,
+-clubs
+-leagues
+
+----------------------------------------------------------------
+
+Gary – Players and records
+Player management
+
+Responsible for managing players and storing their information.
+- Add new players.
+- Remove players.
+- Store player names and IDs.
+- Display player information.
+- Keep records of previous games.
+- Track player statistics, such as wins and losses.
+
+Files:
+Player.h
+Player.cpp
+PlayerRecords.h
+PlayerRecords.cpp
+
+----------------------------------------------------------------
+
+Hugo – Dart game, scoring and menu
+Core game logic
+
+Responsible for the actual darts game and calculating scores.
+- 301 short games.
+- 501 long games.
+- Singles, doubles and triples.
+- Calculate remaining scores.
+- Detect busts (going below zero or finishing incorrectly).
+- Finish on a double.
+- Detect when a player wins.
+- Support different numbers of players.
+
+Files:
+Menu.h
+Menu.cpp
+Game.h
+Game.cpp
+Score.h
+Score.cpp
+
+----------------------------------------------------------------
+
+Brendan – Tournaments, clubs and leagues
+Competition management
+
+Responsible for organising games into larger competitions.
+- Create tournaments.
+- Add players to tournaments.
+- Organise fixtures.
+- Track tournament results.
+- Create clubs.
+- Create leagues.
+- Maintain league tables.
+
+Files:
+Tournament.h
+Tournament.cpp
+Club.h
+Club.cpp
+League.h
+League.cpp
+
+----------------------------------------------------------------
+
+maybe able to set new player profiles so like menu has
+
+new game > short long tournament > select player > new player > enter name
+
+game history (w players and score count)
+
+leaderboard w club names
+
+
+
+char multiplier d D or t T or s S
+cin >> multiplier (eg Double(d) triple(t) single (s))
+
+multiplier = toupper(multiplier)
+
+rename player1 to eg Hugo 
+
+p1.remScore
+
+visit is the total of each dart throw
+
+visit = throw1 + throw2 +throw3
+
+remScore = remScore - visit
+
+if (remScore - visit == 0)
+remScore = remScore - visit
+p1.winner ? ?
+else if (remScore - visit <= 1) // cant double 
+find way to reset
+else
+continue 
