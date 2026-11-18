@@ -48,11 +48,21 @@ The app saves players, game history and competitions in three local `dart_*.txt`
 
 ## Ten-minute demo
 
+Before presenting, build the app and create two fictional player accounts. Have their player IDs ready for Hugo. In a second terminal, run `.\darts.exe --demo` and leave the output ready for Brendan.
+
 | Time | Presenter | What to show |
 | --- | --- | --- |
-| 0–3 min | Gary | Add a fictional player as admin, sign out, and sign in as that player to change the address. |
-| 3–6 min | Hugo | Start 301 with two players. Enter `180`, `0`, `81`, `0`, `40`, `n`, `2`, `0`, `40`, `y`, `1` to show a bust on 40 and then a D20 win. |
-| 6–10 min | Brendan | Run `.\darts.exe --demo` and show the points table, the semifinal winners meeting in the final, and the champion's prize in the leaderboard. |
+| 0:00–3:00 | Gary | **Accounts and privacy.** Show that an admin can select any player profile. Sign out, sign in as a fictional player, and show that player's own profile. |
+| 3:00–7:00 | Hugo | **Live scoring.** Play a 301 match with two prepared players. Explain a bust and a double finish, then show the saved match in Game History. Mention that 501 uses the same rules. |
+| 7:00–10:00 | Brendan | **Prepared results.** Switch to the demo output. Point out the league table and the cup final winner's €50 prize. Finish within three minutes. |
+
+Hugo can enter these values one at a time when prompted in the 301 match. The first player reaches 40, busts with two single 20s, then wins with double 20.
+
+```text
+180, 0, 81, 0, 40, n, 2, 0, 40, y, 1
+```
+
+Brendan can say, “Every pair plays once in the league, and a win earns two points. In the cup, the two semifinal winners meet in the final. Here’s the champion and the €50 prize.”
 
 ## Source credits
 
