@@ -1,3 +1,7 @@
+// Hugo McGlynn wrote the original menu.
+// Brendan Galvin connected the competition menus in his patch.
+// Codex integrated accounts, games, records and competitions.
+
 // Menu.cpp
 #include "menu.h"
 #include "Competitions.h"

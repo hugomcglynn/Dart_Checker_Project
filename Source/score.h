@@ -1,3 +1,6 @@
+// Hugo McGlynn wrote the original scoring declarations.
+// Codex added the visit-scoring declarations.
+
 //score.h
 #ifndef SCORE_H
 #define SCORE_H

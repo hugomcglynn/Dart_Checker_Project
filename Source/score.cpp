@@ -1,3 +1,7 @@
+// Hugo McGlynn wrote the original single-dart scoring.
+// Brendan Galvin corrected the header filename in his patch.
+// Codex added visit scoring and double-out validation.
+
 //score.cpp
 #include <cctype>  //needed for toupper
 #include "score.h"

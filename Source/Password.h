@@ -1,3 +1,6 @@
+// This file supports Gary's player accounts and records area.
+// Codex implemented this file during integration.
+
 #ifndef PASSWORD_H
 #define PASSWORD_H
 

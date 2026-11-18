@@ -1,3 +1,6 @@
+// Gary is responsible for accounts and profiles in the team plan.
+// Codex implemented this file during integration.
+
 #ifndef PLAYER_RECORDS_H
 #define PLAYER_RECORDS_H
 

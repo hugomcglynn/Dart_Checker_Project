@@ -1,3 +1,6 @@
+// Brendan Galvin supplied the original competition management code.
+// Codex integrated it with the shared player and match records.
+
 #include "Competitions.h"
 #include "Club.h"
 #include "Game.h"

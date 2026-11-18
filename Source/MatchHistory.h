@@ -1,3 +1,6 @@
+// Gary is responsible for match history and player statistics in the team plan.
+// Codex implemented this file during integration.
+
 #ifndef MATCH_HISTORY_H
 #define MATCH_HISTORY_H
 

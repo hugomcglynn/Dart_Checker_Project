@@ -1,3 +1,6 @@
+// Brendan Galvin supplied the original club code.
+// Codex integrated it with the shared player and match records.
+
 #ifndef CLUB_H
 #define CLUB_H
 

@@ -1,3 +1,6 @@
+// Gary is responsible for player profiles in the team plan.
+// Codex implemented this file during integration.
+
 #ifndef PLAYER_H
 #define PLAYER_H
 

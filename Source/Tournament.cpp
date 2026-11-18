@@ -1,3 +1,6 @@
+// Brendan Galvin supplied the original tournament code.
+// Codex integrated it with the shared player and match records.
+
 #include "Tournament.h"
 using namespace std;
 

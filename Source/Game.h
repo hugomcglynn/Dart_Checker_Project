@@ -1,3 +1,6 @@
+// Hugo McGlynn is responsible for gameplay in the team plan.
+// Codex implemented this file using Hugo's original dart scoring.
+
 #ifndef GAME_H
 #define GAME_H
 

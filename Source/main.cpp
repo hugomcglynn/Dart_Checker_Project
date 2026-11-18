@@ -1,3 +1,6 @@
+// Brendan Galvin supplied the first working app entry point.
+// Codex added command-line and demo support.
+
 #include "menu.h"
 #include <iostream>
 #include <string>

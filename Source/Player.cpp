@@ -1,3 +1,6 @@
+// Gary is responsible for player profiles in the team plan.
+// Codex implemented this file during integration.
+
 #include "Player.h"
 
 Player::Player(int playerId, const std::string& playerName, int playerAge,

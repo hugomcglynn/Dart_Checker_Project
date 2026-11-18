@@ -1,3 +1,5 @@
+// Hugo McGlynn wrote this starter example.
+
 #include <iostream>
 
 int main() {

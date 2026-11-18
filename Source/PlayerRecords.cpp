@@ -1,3 +1,6 @@
+// Gary is responsible for accounts and profiles in the team plan.
+// Codex implemented this file during integration.
+
 #include "PlayerRecords.h"
 #include "MatchHistory.h"
 #include "Password.h"

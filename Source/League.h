@@ -1,3 +1,6 @@
+// Brendan Galvin supplied the original league code.
+// Codex integrated it with the shared player and match records.
+
 #ifndef LEAGUE_H
 #define LEAGUE_H
 

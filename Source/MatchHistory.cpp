@@ -1,3 +1,6 @@
+// Gary is responsible for match history and player statistics in the team plan.
+// Codex implemented this file during integration.
+
 #include "MatchHistory.h"
 #include "Club.h"
 #include "Competitions.h"

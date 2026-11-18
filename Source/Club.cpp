@@ -1,3 +1,6 @@
+// Brendan Galvin supplied the original club code.
+// Codex integrated it with the shared player and match records.
+
 #include "Club.h"
 #include "Competitions.h"
 #include "PlayerRecords.h"

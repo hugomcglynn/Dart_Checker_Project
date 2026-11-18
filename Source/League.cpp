@@ -1,3 +1,6 @@
+// Brendan Galvin supplied the original league code.
+// Codex integrated it with the shared player and match records.
+
 #include "League.h"
 #include "PlayerRecords.h"
 #include <iostream>

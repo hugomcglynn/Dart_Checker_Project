@@ -54,4 +54,12 @@ The app saves players, game history and competitions in three local `dart_*.txt`
 | 3–6 min | Hugo | Start 301 with two players. Enter `180`, `0`, `81`, `0`, `40`, `n`, `2`, `0`, `40`, `y`, `1` to show a bust on 40 and then a D20 win. |
 | 6–10 min | Brendan | Run `.\darts.exe --demo` and show the points table, the semifinal winners meeting in the final, and the champion's prize in the leaderboard. |
 
-Hugo's menu and original scoring were on GitHub. Brendan supplied the clubs, leagues and tournament patch. Gary's assigned player and records area was implemented during integration.
+## Source credits
+
+Each C++ source and header has a credit at the top. The credits distinguish the original code, the team's assigned areas and the work Codex completed during integration.
+
+| Team member | Files |
+| --- | --- |
+| Hugo McGlynn | Wrote the original `menu.cpp`, `menu.h`, `score.cpp`, `score.h` and the starter `main.cpp` in the repository root. Codex wrote `Game.cpp` and `Game.h` in Hugo's gameplay area using his scoring rules. |
+| Brendan Galvin | Supplied `Club.cpp`, `Club.h`, `Competitions.cpp`, `Competitions.h`, `League.cpp`, `League.h`, `Tournament.cpp`, `Tournament.h` and the first working `Source/main.cpp` in his patch. His patch also updated the menu and corrected the scoring include. |
+| Gary | Assigned player accounts and records. Codex implemented `Player.cpp`, `Player.h`, `PlayerRecords.cpp`, `PlayerRecords.h`, `MatchHistory.cpp`, `MatchHistory.h`, `Password.cpp` and `Password.h` in that area. |
