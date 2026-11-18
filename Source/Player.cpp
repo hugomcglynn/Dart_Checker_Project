@@ -2,9 +2,9 @@
 
 Player::Player(int playerId, const std::string& playerName, int playerAge,
                const std::string& playerNationality, const std::string& playerAddress,
-               const std::string& playerPin, bool activePlayer)
+               const std::string& hash, bool activePlayer, bool needsPassword)
     : id(playerId), name(playerName), age(playerAge), nationality(playerNationality),
-      address(playerAddress), pin(playerPin), active(activePlayer)
+      address(playerAddress), passwordHash(hash), active(activePlayer), needsNewPassword(needsPassword)
 {
 }
 

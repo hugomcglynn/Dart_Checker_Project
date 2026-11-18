@@ -35,6 +35,6 @@ Makefile
 /darts
 
 # Local player, match and competition saves
-/dart_players.txt
-/dart_history.txt
-/dart_competitions.txt
+dart_players.txt
+dart_history.txt
+dart_competitions.txt

@@ -141,7 +141,7 @@ int demo()
     cout << "\nDart Checker Demo\nDemo data folder: " << directory.string() << '\n';
     for (int i = 0; i < 4; ++i)
     {
-        ids[i] = players.addPlayer(names[i], 20 + i, "Irish", "Fictional demo address", "1234");
+        ids[i] = players.addPlayer(names[i], 20 + i, "Irish", "Fictional demo address", "DartsDemoOnly");
         if (ids[i] <= 0)
             return 1;
     }

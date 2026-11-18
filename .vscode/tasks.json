@@ -5,10 +5,10 @@
 			"label": "Build Dart Checker",
 			"type": "process",
 			"command": "sh",
-			"args": ["-c", "g++ -std=c++17 -g Source/*.cpp -o darts"],
+			"args": ["-c", "g++ -std=c++17 -g Source/*.cpp -o darts -lcrypto"],
 			"windows": {
 				"command": "powershell.exe",
-				"args": ["-NoProfile", "-Command", "$ErrorActionPreference = 'Stop'; $sources = (Get-ChildItem -File 'Source/*.cpp').FullName; g++ -std=c++17 -g $sources -o darts.exe; exit $LASTEXITCODE"]
+				"args": ["-NoProfile", "-Command", "$ErrorActionPreference = 'Stop'; $sources = (Get-ChildItem -File 'Source/*.cpp').FullName; g++ -std=c++17 -g $sources -o darts.exe -lbcrypt; exit $LASTEXITCODE"]
 			},
 			"options": { "cwd": "${workspaceFolder}" },
 			"problemMatcher": ["$gcc"],
