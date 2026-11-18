@@ -31,3 +31,10 @@ Makefile
 # Other system files
 *.log
 *.tmp
+
+/darts
+
+# Local player, match and competition saves
+/dart_players.txt
+/dart_history.txt
+/dart_competitions.txt

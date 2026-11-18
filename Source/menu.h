@@ -2,6 +2,7 @@
 #ifndef MENU_H
 #define MENU_H
 
-void mainMenu();
+int mainMenu();
+int demo();
 
 #endif
