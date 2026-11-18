@@ -2,6 +2,19 @@
 	"version": "2.0.0",
 	"tasks": [
 		{
+			"label": "Build Dart Checker",
+			"type": "process",
+			"command": "sh",
+			"args": ["-c", "g++ -std=c++17 -g Source/*.cpp -o darts -lcrypto"],
+			"windows": {
+				"command": "powershell.exe",
+				"args": ["-NoProfile", "-Command", "$ErrorActionPreference = 'Stop'; $sources = (Get-ChildItem -File 'Source/*.cpp').FullName; g++ -std=c++17 -g $sources -o darts.exe -lbcrypt; exit $LASTEXITCODE"]
+			},
+			"options": { "cwd": "${workspaceFolder}" },
+			"problemMatcher": ["$gcc"],
+			"group": { "kind": "build", "isDefault": true }
+		},
+		{
 			"type": "cppbuild",
 			"label": "C/C++: g++.exe build active file",
 			"command": "C:\\MinGW\\bin\\g++.exe",
@@ -20,7 +33,7 @@
 			],
 			"group": {
 				"kind": "build",
-				"isDefault": true
+				"isDefault": false
 			},
 			"detail": "compiler: C:\\MinGW\\bin\\g++.exe"
 		}

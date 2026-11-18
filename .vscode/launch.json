@@ -5,6 +5,20 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "Dart Checker",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/darts",
+            "MIMode": "gdb",
+            "windows": {
+                "program": "${workspaceFolder}/darts.exe",
+                "miDebuggerPath": "gdb.exe"
+            },
+            "cwd": "${workspaceFolder}",
+            "externalConsole": false,
+            "preLaunchTask": "Build Dart Checker"
+        },
+        {
             "name": "(gdb) Launch",
             "type": "cppdbg",
             "request": "launch",
