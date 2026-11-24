@@ -1,8 +1,6 @@
-// Hugo McGlynn wrote the original menu.
-// Brendan Galvin connected the competition menus in his patch.
-// Codex integrated accounts, games, records and competitions.
+// Original menu by Hugo McGlynn. Competition menu changes by Brendan Galvin.
+// App integration by Codex.
 
-// Menu.cpp
 #include "menu.h"
 #include "Competitions.h"
 #include "Game.h"
@@ -11,62 +9,43 @@
 #include <chrono>
 #include <filesystem>
 #include <iostream>
-#include <sstream>
 
 using namespace std;
 
 namespace
 {
-int menuNumber(const string& prompt, int low, int high)
-{
-    string line;
-    while (cout << prompt && getline(cin, line))
-    {
-        istringstream input(line);
-        int number;
-        char extra;
-        if (input >> number && !(input >> extra) && number >= low && number <= high)
-            return number;
-        cout << "Invalid selection!\n";
-    }
-    return 0;
-}
-
 void newGameMenu(PlayerRecords& players, MatchHistory& history)
 {
     cout << "\n1. Short game (301)\n2. Long game (501)\n3. Back\n";
-    int choice = menuNumber("Enter choice: ", 1, 3);
+    int choice = askNumber("Enter choice: ", 1, 3, false);
     if (choice == 0 || choice == 3)
         return;
 
-    int count = menuNumber("How many players (2-8, 0 back)? ", 0, 8);
+    int count = askNumber("How many players (2-8, 0 back)? ", 2, MAX_MATCH_PLAYERS);
     if (count == 0)
         return;
-    if (count == 1)
-    {
-        cout << "At least two players are needed.\n";
-        return;
-    }
 
-    int ids[8];
-    string names[8];
-    for (int i = 0; i < count; ++i)
+    int ids[MAX_MATCH_PLAYERS];
+    string names[MAX_MATCH_PLAYERS];
+    int picked = 0;
+    while (picked < count)
     {
-        cout << "\nChoose player " << i + 1 << ".\n";
-        ids[i] = players.selectPlayer(true);
-        if (ids[i] <= 0)
+        cout << "\nChoose player " << picked + 1 << ".\n";
+        int id = players.selectPlayer(true);
+        if (id <= 0)
             return;
         bool alreadyPicked = false;
-        for (int j = 0; j < i; ++j)
-            if (ids[j] == ids[i])
+        for (int i = 0; i < picked; ++i)
+            if (ids[i] == id)
                 alreadyPicked = true;
         if (alreadyPicked)
         {
             cout << "That player is already in this game.\n";
-            --i;
             continue;
         }
-        names[i] = players.name(ids[i]);
+        ids[picked] = id;
+        names[picked] = players.name(id);
+        ++picked;
     }
 
     MatchResult result{};
@@ -87,8 +66,7 @@ int mainMenu()
         return 1;
     }
 
-    int choice = 0;
-    while (choice != 8)
+    while (true)
     {
         cout << "\n================================\n";
         cout << "          DART CHECKER\n";
@@ -103,7 +81,7 @@ int mainMenu()
         cout << "8. Exit\n";
         cout << "================================\n";
 
-        choice = menuNumber("Enter choice: ", 1, 8);
+        int choice = askNumber("Enter choice: ", 1, 8, false);
         switch (choice)
         {
             case 1: newGameMenu(players, history); break;
@@ -113,11 +91,10 @@ int mainMenu()
             case 5:
             case 6:
             case 7: competitionMenu(choice, players, history, players.isAdmin(), competitionFile); break;
-            case 8: cout << "Exiting...\n"; break;
+            case 8: cout << "Exiting...\n"; return 0;
             case 0: return 0;
         }
     }
-    return 0;
 }
 
 int demo()
@@ -150,12 +127,20 @@ int demo()
             return 1;
     }
 
-    MatchResult result{};
-    if (!playMatch(301, ids, names, 2, result, true) || !history.record(result, players)
-        || !playMatch(501, ids + 2, names + 2, 2, result, true) || !history.record(result, players)
-        || !runCompetitionDemo(players, history, competitionFile, ids))
+    const int scores[] = {301, 501};
+    for (int i = 0; i < 2; ++i)
     {
-        cerr << "Could not complete the demo.\n";
+        MatchResult result{};
+        if (!playMatch(scores[i], ids + 2 * i, names + 2 * i, 2, result, true)
+            || !history.record(result, players))
+        {
+            cerr << "Could not save the demo match.\n";
+            return 1;
+        }
+    }
+    if (!runCompetitionDemo(players, history, competitionFile, ids))
+    {
+        cerr << "Could not finish the demo competitions.\n";
         return 1;
     }
 

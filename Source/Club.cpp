@@ -9,21 +9,23 @@
 #include <iomanip>
 using namespace std;
 
-Club::Club(string clubName)
+Club::Club(string clubName) : name(clubName) {}
+
+int Club::memberIndex(int playerId) const
 {
-    name = clubName;
+    for (int i = 0; i < playerCount; i++)
+        if (playerIds[i] == playerId)
+            return i;
+
+    return -1;
 }
 
 bool Club::hasPlayer(int playerId) const
 {
-    for (int i = 0; i < playerCount; i++)
-        if (playerIds[i] == playerId)
-            return true;
-
-    return false;
+    return memberIndex(playerId) >= 0;
 }
 
-void Club::addPlayer(int playerId)
+bool Club::addPlayer(int playerId)
 {
     if (playerId <= 0)
         cout << "Player IDs must be positive.\n";
@@ -35,21 +37,24 @@ void Club::addPlayer(int playerId)
     {
         playerIds[playerCount] = playerId;
         playerCount++;
+        return true;
     }
+    return false;
 }
 
-void Club::removePlayer(int playerId)
+bool Club::removePlayer(int playerId)
 {
-    for (int i = 0; i < playerCount; i++)
-        if (playerIds[i] == playerId)
-        {
-            for (int j = i; j < playerCount - 1; j++)
-                playerIds[j] = playerIds[j + 1];
-            playerCount--;
-            return;
-        }
+    int index = memberIndex(playerId);
+    if (index < 0)
+    {
+        cout << "Player is not in this club.\n";
+        return false;
+    }
 
-    cout << "Player is not in this club.\n";
+    for (int i = index; i < playerCount - 1; i++)
+        playerIds[i] = playerIds[i + 1];
+    playerCount--;
+    return true;
 }
 
 void Club::displayClub(const PlayerRecords& players) const
@@ -72,6 +77,22 @@ void Club::save(ostream& out) const
     out << '\n';
 }
 
+static const Club* clubForPlayer(int playerId, const vector<Club>& clubs)
+{
+    for (const Club& club : clubs)
+        if (club.hasPlayer(playerId))
+            return &club;
+    return nullptr;
+}
+
+string competitionClub(int playerId, const vector<Club>& clubs)
+{
+    const Club* club = clubForPlayer(playerId, clubs);
+    if (club == nullptr)
+        return "-";
+    return club->getName();
+}
+
 bool clubAction(vector<Club>& clubs, int choice, const PlayerRecords& players)
 {
     if (choice == 1)
@@ -90,37 +111,29 @@ bool clubAction(vector<Club>& clubs, int choice, const PlayerRecords& players)
     if (i < 0)
         return false;
     Club& club = clubs[i];
-    if (choice == 4)
-    {
-        club.displayClub(players);
-        return false;
-    }
-
     if (choice == 2)
         players.listPlayers();
     else
         club.displayClub(players);
+    if (choice == 4)
+        return false;
+
     int id = askNumber("Player ID (0 to cancel): ", 1, INT_MAX);
     if (id == 0)
         return false;
-    if (choice == 2)
-    {
-        if (!players.isActive(id))
-        {
-            cout << "Choose an active player ID.\n";
-            return false;
-        }
-        for (const Club& other : clubs)
-            if (other.hasPlayer(id))
-            {
-                cout << "Player " << id << " already belongs to " << other.getName() << ".\n";
-                return false;
-            }
-        club.addPlayer(id);
-        return club.hasPlayer(id);
-    }
+    if (choice == 3)
+        return club.removePlayer(id);
 
-    bool wasMember = club.hasPlayer(id);
-    club.removePlayer(id);
-    return wasMember;
+    if (!players.isActive(id))
+    {
+        cout << "Choose an active player ID.\n";
+        return false;
+    }
+    const Club* currentClub = clubForPlayer(id, clubs);
+    if (currentClub != nullptr)
+    {
+        cout << "Player " << id << " already belongs to " << currentClub->getName() << ".\n";
+        return false;
+    }
+    return club.addPlayer(id);
 }

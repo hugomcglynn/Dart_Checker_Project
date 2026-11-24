@@ -25,7 +25,8 @@ static int readNumber(const string& prompt)
 {
     istringstream input(readText(prompt));
     int number;
-    if (input >> number && (input >> ws).eof())
+    char extra;
+    if (input >> number && !(input >> extra))
         return number;
     return numeric_limits<int>::min();
 }
@@ -34,6 +35,33 @@ static bool validLegacyPin(const string& pin)
 {
     return pin.size() >= 4 && pin.size() <= 12 &&
            pin.find_first_not_of("0123456789") == string::npos;
+}
+
+// Version 1 contains PINs. Version 2 contains hashes and a PIN-upgrade flag.
+static bool readSavedPassword(istream& input, bool legacy, string& hash,
+                              bool& needsNewPassword, bool allowEmpty = false)
+{
+    if (!(input >> quoted(hash)))
+        return false;
+
+    if (legacy)
+    {
+        if (hash.empty())
+            return allowEmpty;
+        if (!validLegacyPin(hash))
+            return false;
+        hash = hashPassword(hash);
+        needsNewPassword = true;
+        return !hash.empty();
+    }
+
+    int upgrade;
+    if (!(input >> upgrade) || (upgrade != 0 && upgrade != 1))
+        return false;
+    needsNewPassword = upgrade == 1;
+    if (hash.empty())
+        return allowEmpty && !needsNewPassword;
+    return validPasswordHash(hash);
 }
 
 static bool validNewPassword(const string& password)
@@ -73,24 +101,14 @@ bool PlayerRecords::load()
         return !filesystem::exists(filename, error) && !error;
     }
 
-    string version, savedAdminHash;
-    if (!(input >> version >> quoted(savedAdminHash)) ||
-        (version != "DART_PLAYERS_1" && version != "DART_PLAYERS_2"))
+    string version;
+    if (!(input >> version) || (version != "DART_PLAYERS_1" && version != "DART_PLAYERS_2"))
         return false;
 
     const bool legacy = version == "DART_PLAYERS_1";
-    int adminUpgrade = 0;
-    if (legacy && !savedAdminHash.empty())
-    {
-        if (!validLegacyPin(savedAdminHash))
-            return false;
-        savedAdminHash = hashPassword(savedAdminHash);
-        if (savedAdminHash.empty())
-            return false;
-        adminUpgrade = 1;
-    }
-    if (!legacy && (!(input >> adminUpgrade) || (adminUpgrade != 0 && adminUpgrade != 1) ||
-                    (savedAdminHash.empty() ? adminUpgrade != 0 : !validPasswordHash(savedAdminHash))))
+    string savedAdminHash;
+    bool adminUpgrade = false;
+    if (!readSavedPassword(input, legacy, savedAdminHash, adminUpgrade, true))
         return false;
 
     vector<Player> savedPlayers;
@@ -98,10 +116,9 @@ bool PlayerRecords::load()
     while (!input.eof())
     {
         int id, age, active;
-        int upgrade = 0;
+        bool upgrade = false;
         string name, nationality, address, hash;
-        if (!(input >> id >> active >> age >> quoted(name) >> quoted(nationality) >>
-              quoted(address) >> quoted(hash)))
+        if (!(input >> id >> active >> age >> quoted(name) >> quoted(nationality) >> quoted(address)))
             return false;
 
         if (id < 1 || (!savedPlayers.empty() && id <= savedPlayers.back().getId()) ||
@@ -109,19 +126,10 @@ bool PlayerRecords::load()
             name.find_first_not_of(" \t\r\n") == string::npos)
             return false;
 
-        if (legacy)
-        {
-            if (!validLegacyPin(hash))
-                return false;
-            hash = hashPassword(hash);
-            if (hash.empty())
-                return false;
-            upgrade = 1;
-        }
-        else if (!(input >> upgrade) || (upgrade != 0 && upgrade != 1) || !validPasswordHash(hash))
+        if (!readSavedPassword(input, legacy, hash, upgrade))
             return false;
 
-        savedPlayers.emplace_back(id, name, age, nationality, address, hash, active == 1, upgrade == 1);
+        savedPlayers.emplace_back(id, name, age, nationality, address, hash, active == 1, upgrade);
         input >> ws;
     }
     if (input.bad())
@@ -129,11 +137,10 @@ bool PlayerRecords::load()
 
     input.close();
     adminHash = savedAdminHash;
-    adminNeedsNewPassword = adminUpgrade == 1;
+    adminNeedsNewPassword = adminUpgrade;
     players.swap(savedPlayers);
-    accountRole = AccountRole::Guest;
-    playerSession = 0;
-    // Replace a PIN-era file as soon as it is read so it no longer stores plaintext PINs.
+    signedInId = 0;
+    // Save the hashes immediately to remove the original PINs.
     return !legacy || save();
 }
 
@@ -185,53 +192,49 @@ const Player* PlayerRecords::find(int id) const
 bool PlayerRecords::isActive(int id) const
 {
     const Player* player = find(id);
-    return player != nullptr && player->active;
+    return player != nullptr && player->isActive();
 }
 
-int PlayerRecords::lastId() const
+vector<int> PlayerRecords::activeIds() const
 {
-    return players.empty() ? 0 : players.back().id;
+    vector<int> ids;
+    for (const Player& player : players)
+    {
+        if (player.isActive())
+            ids.push_back(player.getId());
+    }
+    return ids;
 }
 
 string PlayerRecords::name(int id) const
 {
     const Player* player = find(id);
-    return player == nullptr ? "Player #" + to_string(id) : player->name;
+    return player == nullptr ? "Player #" + to_string(id) : player->getName();
 }
 
-void PlayerRecords::listPlayers() const
+void PlayerRecords::listPlayers(bool includeInactive) const
 {
     bool found = false;
     for (const Player& player : players)
     {
-        if (player.active)
-        {
-            cout << player.id << ". " << player.name << '\n';
-            found = true;
-        }
-    }
-    if (!found)
-        cout << "No active players.\n";
-}
-
-void PlayerRecords::listProfiles() const
-{
-    for (const Player& player : players)
-    {
+        if (!player.active && !includeInactive)
+            continue;
         cout << player.id << ". " << player.name;
         if (!player.active)
             cout << " (inactive)";
         cout << '\n';
+        found = true;
     }
-    if (players.empty())
-        cout << "No player profiles.\n";
+    if (!found)
+        cout << (includeInactive ? "No player profiles.\n" : "No active players.\n");
 }
 
 int PlayerRecords::addPlayer(const string& name, int age, const string& nationality,
                              const string& address, const string& password)
 {
+    int lastId = players.empty() ? 0 : players.back().getId();
     if (name.find_first_not_of(" \t\r\n") == string::npos || age < 1 || age > 120 ||
-        !validNewPassword(password) || lastId() == numeric_limits<int>::max() ||
+        !validNewPassword(password) || lastId == numeric_limits<int>::max() ||
         name.find_first_of("\r\n") != string::npos ||
         nationality.find_first_of("\r\n") != string::npos ||
         address.find_first_of("\r\n") != string::npos)
@@ -240,7 +243,7 @@ int PlayerRecords::addPlayer(const string& name, int age, const string& national
     string hash = hashPassword(password);
     if (hash.empty())
         return 0;
-    int id = lastId() + 1;
+    int id = lastId + 1;
     players.emplace_back(id, name, age, nationality, address, hash);
     if (save())
         return id;
@@ -295,12 +298,12 @@ int PlayerRecords::selectPlayer(bool allowCreate)
 
 bool PlayerRecords::isAdmin() const
 {
-    return accountRole == AccountRole::Admin;
+    return signedInId == ADMIN_SESSION;
 }
 
 int PlayerRecords::signedInPlayer() const
 {
-    return playerSession;
+    return signedInId > 0 ? signedInId : 0;
 }
 
 bool PlayerRecords::replacePassword(string& storedHash, bool& needsNewPassword)
@@ -352,10 +355,7 @@ void PlayerRecords::signIn()
 {
     const int role = readNumber("Sign in as 1. Admin, 2. Player, 0. Back: ");
     if (role == 1 || role == 2)
-    {
-        accountRole = AccountRole::Guest;
-        playerSession = 0;
-    }
+        signedInId = 0;
 
     if (role == 1)
     {
@@ -368,7 +368,7 @@ void PlayerRecords::signIn()
         else if (!authenticate(adminHash, adminNeedsNewPassword, "Admin"))
             return;
 
-        accountRole = AccountRole::Admin;
+        signedInId = ADMIN_SESSION;
     }
     else if (role == 2)
     {
@@ -378,8 +378,7 @@ void PlayerRecords::signIn()
         Player& player = players[findIndex(id)];
         if (!authenticate(player.passwordHash, player.needsNewPassword, "Player"))
             return;
-        accountRole = AccountRole::Player;
-        playerSession = id;
+        signedInId = id;
     }
     else if (role != 0 && cin)
     {
@@ -395,9 +394,9 @@ void PlayerRecords::changePassword()
             replacePassword(adminHash, adminNeedsNewPassword);
         return;
     }
-    if (accountRole == AccountRole::Player)
+    if (signedInPlayer() != 0)
     {
-        Player& player = players[findIndex(playerSession)];
+        Player& player = players[findIndex(signedInId)];
         if (authenticate(player.passwordHash, player.needsNewPassword, "Player"))
             replacePassword(player.passwordHash, player.needsNewPassword);
         return;
@@ -407,7 +406,7 @@ void PlayerRecords::changePassword()
 
 bool PlayerRecords::showProfile(int id) const
 {
-    if (!isAdmin() && (accountRole != AccountRole::Player || playerSession != id))
+    if (!isAdmin() && (signedInPlayer() == 0 || signedInId != id))
     {
         cout << "Only the player or admin can view these details.\n";
         return false;
@@ -430,7 +429,7 @@ bool PlayerRecords::showProfile(int id) const
 
 void PlayerRecords::changeAddress()
 {
-    if (playerSession == 0)
+    if (signedInPlayer() == 0)
     {
         cout << "Sign in as a player to update your address.\n";
         return;
@@ -440,21 +439,15 @@ void PlayerRecords::changeAddress()
     if (address.find_first_not_of(" \t") == string::npos)
         return;
 
-    for (Player& player : players)
+    Player& player = players[findIndex(signedInId)];
+    const string oldAddress = player.address;
+    player.address = address;
+    if (save())
+        cout << "Address updated.\n";
+    else
     {
-        if (player.id == playerSession)
-        {
-            const string oldAddress = player.address;
-            player.address = address;
-            if (save())
-                cout << "Address updated.\n";
-            else
-            {
-                player.address = oldAddress;
-                cout << "The address could not be saved.\n";
-            }
-            return;
-        }
+        player.address = oldAddress;
+        cout << "The address could not be saved.\n";
     }
 }
 
@@ -464,21 +457,15 @@ void PlayerRecords::removePlayer()
     if (id == 0)
         return;
 
-    for (Player& player : players)
+    // Keep the ID and name for past games.
+    Player& player = players[findIndex(id)];
+    player.active = false;
+    if (save())
+        cout << "Removed " << player.name << " from active players.\n";
+    else
     {
-        if (player.id == id)
-        {
-            // Keep the ID and name available for past games.
-            player.active = false;
-            if (save())
-                cout << "Removed " << player.name << " from active players.\n";
-            else
-            {
-                player.active = true;
-                cout << "The change could not be saved.\n";
-            }
-            return;
-        }
+        player.active = true;
+        cout << "The change could not be saved.\n";
     }
 }
 
@@ -486,8 +473,8 @@ void PlayerRecords::showSignedIn() const
 {
     if (isAdmin())
         cout << "\nSigned in as admin.\n";
-    else if (playerSession != 0)
-        cout << "\nSigned in as " << name(playerSession) << ".\n";
+    else if (signedInId != 0)
+        cout << "\nSigned in as " << name(signedInId) << ".\n";
     else
         cout << "\nSigned out.\n";
 }
@@ -511,10 +498,10 @@ void PlayerRecords::accountMenu(const MatchHistory& history)
                 break;
             case 2:
             {
-                int id = playerSession;
+                int id = signedInPlayer();
                 if (isAdmin())
                 {
-                    listProfiles();
+                    listPlayers(true);
                     id = readNumber("Player ID (0 back): ");
                     if (id == 0 || !cin)
                         break;
@@ -539,8 +526,7 @@ void PlayerRecords::accountMenu(const MatchHistory& history)
                     cout << "Sign in as admin to remove players.\n";
                 break;
             case 6:
-                accountRole = AccountRole::Guest;
-                playerSession = 0;
+                signedInId = 0;
                 break;
             case 7:
                 changePassword();

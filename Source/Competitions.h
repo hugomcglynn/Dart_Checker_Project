@@ -16,6 +16,8 @@ struct Fixture
     int second;
     int winner = 0;  // 0 means the match has not been played.
     int legacyWinner = 0;
+
+    bool canPlay() const;
 };
 
 // Both a league and a tournament keep a list of fixtures.
@@ -39,7 +41,7 @@ private:
 };
 
 const int MAX_LEAGUE_PLAYERS = 8;
-int askNumber(const std::string& prompt, int low, int high);
+int askNumber(const std::string& prompt, int low, int high, bool allowBack = true);
 std::string askName(const std::string& what);
 std::vector<int> enterPlayers(int count, const PlayerRecords& players);
 

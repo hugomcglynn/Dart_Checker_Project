@@ -1,5 +1,4 @@
-// Gary is responsible for match history and player statistics in the team plan.
-// Codex implemented this file during integration.
+// Gary's records area. Implemented by Codex.
 
 #ifndef MATCH_HISTORY_H
 #define MATCH_HISTORY_H
@@ -13,7 +12,7 @@ class PlayerRecords;
 struct SavedMatch
 {
     MatchResult result{};
-    std::string names[8];
+    std::string names[MAX_MATCH_PLAYERS];
     std::string fixtureKey;
     int prizeCents = 0;
 };

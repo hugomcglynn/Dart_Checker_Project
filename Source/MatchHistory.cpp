@@ -1,5 +1,4 @@
-// Gary is responsible for match history and player statistics in the team plan.
-// Codex implemented this file during integration.
+// Gary's records area. Implemented by Codex.
 
 #include "MatchHistory.h"
 #include "Club.h"
@@ -19,7 +18,7 @@ namespace
 bool validMatch(const MatchResult& result)
 {
     if ((result.startingScore != 301 && result.startingScore != 501)
-        || result.count < 2 || result.count > 8)
+        || result.count < 2 || result.count > MAX_MATCH_PLAYERS)
         return false;
 
     bool hasWinner = false;
@@ -32,10 +31,11 @@ bool validMatch(const MatchResult& result)
         for (int j = 0; j < i; ++j)
             if (result.playerIds[i] == result.playerIds[j])
                 return false;
-        if (result.playerIds[i] == result.winnerId && result.remaining[i] == 0)
-            hasWinner = true;
-        else if (result.playerIds[i] == result.winnerId || result.remaining[i] == 0)
+        bool won = result.playerIds[i] == result.winnerId;
+        if (won != (result.remaining[i] == 0))
             return false;
+        if (won)
+            hasWinner = true;
     }
     return hasWinner;
 }
@@ -61,48 +61,60 @@ bool ranksHigher(const Standing& first, const Standing& second)
 {
     if (first.wins != second.wins)
         return first.wins > second.wins;
-    if (average(first) != average(second))
-        return average(first) > average(second);
+    double firstAverage = average(first);
+    double secondAverage = average(second);
+    if (firstAverage != secondAverage)
+        return firstAverage > secondAverage;
     return first.id < second.id;
 }
 
-// Compare ranks using the same players before and after the latest result.
-int rankOf(const vector<Standing>& standings, int index)
+void sortStandings(vector<Standing>& table)
 {
-    int rank = 1;
-    for (int i = 0; i < static_cast<int>(standings.size()); ++i)
-        if (ranksHigher(standings[i], standings[index]))
-            ++rank;
-    return rank;
+    for (size_t i = 0; i < table.size(); ++i)
+    {
+        size_t best = i;
+        for (size_t j = i + 1; j < table.size(); ++j)
+            if (ranksHigher(table[j], table[best]))
+                best = j;
+        swap(table[i], table[best]);
+    }
 }
 
-void countMatch(vector<Standing>& standings, const SavedMatch& match)
+void addMatch(Standing& player, const SavedMatch& match)
 {
     const MatchResult& result = match.result;
-    for (Standing& player : standings)
+    for (int i = 0; i < result.count; ++i)
     {
-        for (int i = 0; i < result.count; ++i)
+        if (player.id != result.playerIds[i])
+            continue;
+
+        int points = result.startingScore - result.remaining[i];
+        player.points += points;
+        // An old match without a dart count still earns points but won't affect the average.
+        if (result.darts[i] >= 0)
         {
-            if (player.id != result.playerIds[i])
-                continue;
-            int points = result.startingScore - result.remaining[i];
-            player.points += points;
-            // Old scores with unknown dart counts still count toward total points.
-            if (result.darts[i] >= 0)
-            {
-                player.pointsWithDartCount += points;
-                player.darts += result.darts[i];
-            }
-            if (player.id == result.winnerId)
-            {
-                ++player.wins;
-                player.prizeCents += match.prizeCents;
-            }
-            else
-                ++player.losses;
-            break;
+            player.pointsWithDartCount += points;
+            player.darts += result.darts[i];
         }
+        if (player.id == result.winnerId)
+        {
+            ++player.wins;
+            player.prizeCents += match.prizeCents;
+        }
+        else
+            ++player.losses;
+        return;
     }
+}
+
+const SavedMatch* findFixture(const vector<SavedMatch>& matches, const string& key)
+{
+    if (key.empty())
+        return nullptr;
+    for (const SavedMatch& match : matches)
+        if (match.fixtureKey == key)
+            return &match;
+    return nullptr;
 }
 }
 
@@ -130,7 +142,7 @@ bool MatchHistory::load()
         if (!(row >> version >> quoted(match.fixtureKey) >> match.prizeCents
                   >> result.startingScore >> result.winnerId >> result.count)
             || (version != 1 && version != 2) || match.prizeCents < 0
-            || result.count < 2 || result.count > 8)
+            || result.count < 2 || result.count > MAX_MATCH_PLAYERS)
             return false;
 
         for (int i = 0; i < result.count; ++i)
@@ -144,12 +156,8 @@ bool MatchHistory::load()
                 return false;
         }
         string extra;
-        if (!validMatch(result) || row >> extra)
+        if (!validMatch(result) || (row >> extra) || findFixture(loaded, match.fixtureKey))
             return false;
-        if (!match.fixtureKey.empty())
-            for (const SavedMatch& previous : loaded)
-                if (previous.fixtureKey == match.fixtureKey)
-                    return false;
         loaded.push_back(match);
     }
     if (input.bad())
@@ -185,11 +193,7 @@ bool MatchHistory::save() const
 
 const SavedMatch* MatchHistory::find(const string& fixtureKey) const
 {
-    if (!fixtureKey.empty())
-        for (const SavedMatch& match : matches)
-            if (match.fixtureKey == fixtureKey)
-                return &match;
-    return nullptr;
+    return findFixture(matches, fixtureKey);
 }
 
 bool MatchHistory::record(const MatchResult& result, const PlayerRecords& players,
@@ -245,52 +249,48 @@ void MatchHistory::show() const
 
 void MatchHistory::showPlayerStats(int playerId) const
 {
-    vector<Standing> stats{{playerId}};
+    Standing player{playerId};
     for (const SavedMatch& match : matches)
-        countMatch(stats, match);
-    const Standing& player = stats[0];
+        addMatch(player, match);
     cout << "Wins: " << player.wins << "\nLosses: " << player.losses
          << "\nCredited points: " << player.points << '\n';
 }
 
 void MatchHistory::showLeaderboard(const PlayerRecords& players, const string& competitionFile) const
 {
-    vector<Standing> before;
-    for (int id = 0; id < players.lastId();)
+    vector<Standing> table;
+    for (int id : players.activeIds())
     {
-        ++id;
-        if (players.isActive(id))
-            before.push_back({id});
+        Standing player{id};
+        for (size_t i = 0; i + 1 < matches.size(); ++i)
+            addMatch(player, matches[i]);
+        table.push_back(player);
     }
-    if (before.empty())
+    if (table.empty())
     {
         cout << "\nNo active players.\n";
         return;
     }
 
-    for (size_t i = 0; i + 1 < matches.size(); ++i)
-        countMatch(before, matches[i]);
-    vector<Standing> after = before;
-    for (int i = 0; i < static_cast<int>(after.size()); ++i)
-        after[i].previousRank = rankOf(before, i);
-    if (!matches.empty())
-        countMatch(after, matches.back());
+    // Rank the players before and after adding the most recent match.
+    sortStandings(table);
+    for (size_t i = 0; i < table.size(); ++i)
+    {
+        table[i].previousRank = static_cast<int>(i) + 1;
+        if (!matches.empty())
+            addMatch(table[i], matches.back());
+    }
+    sortStandings(table);
     const vector<Club> clubs = loadCompetitionClubs(competitionFile);
 
     cout << "\nLeaderboard\n" << left
          << setw(6) << "Rank" << setw(8) << "Move" << setw(23) << "Player"
          << setw(21) << "Club" << right << setw(8) << "3-dart" << setw(6) << "Wins"
          << setw(8) << "Losses" << setw(9) << "Points" << setw(13) << "Prize (EUR)" << '\n';
-    for (int i = 0; i < static_cast<int>(after.size()); ++i)
+    for (size_t i = 0; i < table.size(); ++i)
     {
-        int best = i;
-        for (int j = i + 1; j < static_cast<int>(after.size()); ++j)
-            if (ranksHigher(after[j], after[best]))
-                best = j;
-        swap(after[i], after[best]);
-
-        int rank = i + 1;
-        const Standing& player = after[i];
+        int rank = static_cast<int>(i) + 1;
+        const Standing& player = table[i];
         int movement = player.previousRank - rank;
         string move = movement > 0 ? "+" + to_string(movement) : to_string(movement);
         string club = competitionClub(player.id, clubs);

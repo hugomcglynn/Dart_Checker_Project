@@ -17,11 +17,13 @@
 #include <sstream>
 using namespace std;
 
-Competition::Competition(string competitionName, const vector<int>& entrants)
+bool Fixture::canPlay() const
 {
-    name = competitionName;
-    players = entrants;
+    return first != 0 && second != 0 && winner == 0;
 }
+
+Competition::Competition(string competitionName, const vector<int>& entrants)
+    : players(entrants), name(competitionName) {}
 
 string Competition::getName() const { return name; }
 const vector<int>& Competition::entrants() const { return players; }
@@ -33,9 +35,7 @@ bool Competition::recordResult(int matchNumber, int winnerId)
         return false;
 
     Fixture& match = fixtures[matchNumber - 1];
-    if (match.winner != 0 || match.first == 0 || match.second == 0)
-        return false;
-    if (winnerId != match.first && winnerId != match.second)
+    if (!match.canPlay() || (winnerId != match.first && winnerId != match.second))
         return false;
 
     match.winner = winnerId;
@@ -93,7 +93,7 @@ bool saveData(const Data& data, const string& file)
     return !error;
 }
 
-bool readResults(istream& in, Competition& event)
+bool readLegacyWinners(istream& in, Competition& event)
 {
     for (int i = 1; i <= static_cast<int>(event.matches().size()); i++)
     {
@@ -102,6 +102,62 @@ bool readResults(istream& in, Competition& event)
             return false;
     }
     return true;
+}
+
+// Each save line starts with C, L or T, then the name and the entrant IDs.
+bool readCompetitionLine(istream& row, Data& data)
+{
+    char type;
+    string name;
+    int count;
+    if (!(row >> type >> quoted(name) >> count) || name.empty() ||
+        count < 0 || count > MAX_CLUB_PLAYERS)
+        return false;
+
+    vector<int> ids;
+    for (int i = 0; i < count; i++)
+    {
+        int id;
+        if (!(row >> id) || id < 1 || find(ids.begin(), ids.end(), id) != ids.end())
+            return false;
+        ids.push_back(id);
+    }
+
+    if (type == 'C')
+    {
+        Club club(name);
+        for (int id : ids)
+            club.addPlayer(id);
+        data.clubs.push_back(club);
+    }
+    else if (type == 'L' && count >= 2 && count <= MAX_LEAGUE_PLAYERS)
+    {
+        League league(name, ids);
+        if (!readLegacyWinners(row, league))
+            return false;
+        data.leagues.push_back(league);
+    }
+    else if (type == 'T' && count == 4)
+    {
+        int winners[3];
+        if (!(row >> winners[0] >> winners[1] >> winners[2]))
+            return false;
+        // Older tournament saves end after the winners.
+        int prize = 0;
+        row >> ws;
+        if (!row.eof() && (!(row >> prize) || prize < 0))
+            return false;
+        Tournament cup(name, ids, prize);
+        for (int i = 0; i < 3; i++)
+            if (winners[i] != 0 && !cup.recordLegacyResult(i + 1, winners[i]))
+                return false;
+        data.cups.push_back(cup);
+    }
+    else
+        return false;
+
+    string extra;
+    return !(row >> extra);
 }
 
 bool loadData(Data& data, const string& file)
@@ -120,56 +176,7 @@ bool loadData(Data& data, const string& file)
         if (line.find_first_not_of(" \t\r") == string::npos)
             continue;
         istringstream row(line);
-        char type;
-        string name;
-        int count;
-        if (!(row >> type >> quoted(name) >> count) || name.empty() ||
-            count < 0 || count > MAX_CLUB_PLAYERS)
-            return false;
-
-        vector<int> ids;
-        for (int i = 0; i < count; i++)
-        {
-            int id;
-            if (!(row >> id) || id < 1 || find(ids.begin(), ids.end(), id) != ids.end())
-                return false;
-            ids.push_back(id);
-        }
-
-        if (type == 'C')
-        {
-            Club club(name);
-            for (int id : ids)
-                club.addPlayer(id);
-            data.clubs.push_back(club);
-        }
-        else if (type == 'L' && count >= 2 && count <= MAX_LEAGUE_PLAYERS)
-        {
-            League league(name, ids);
-            if (!readResults(row, league))
-                return false;
-            data.leagues.push_back(league);
-        }
-        else if (type == 'T' && count == 4)
-        {
-            int winners[3];
-            if (!(row >> winners[0] >> winners[1] >> winners[2]))
-                return false;
-            int prize = 0;
-            row >> ws;
-            if (!row.eof() && (!(row >> prize) || prize < 0))
-                return false;
-            Tournament cup(name, ids, prize);
-            for (int i = 0; i < 3; i++)
-                if (winners[i] != 0 && !cup.recordLegacyResult(i + 1, winners[i]))
-                    return false;
-            data.cups.push_back(cup);
-        }
-        else
-            return false;
-
-        string extra;
-        if (row >> extra)
+        if (!readCompetitionLine(row, data))
             return false;
     }
     return in.eof() && !in.bad();
@@ -177,8 +184,8 @@ bool loadData(Data& data, const string& file)
 
 } // file handling
 
-// Every number prompt accepts 0 to go back.
-int askNumber(const string& prompt, int low, int high)
+// Competition prompts accept 0 to go back unless the caller turns that off.
+int askNumber(const string& prompt, int low, int high, bool allowBack)
 {
     string line;
     while (cin)
@@ -190,10 +197,13 @@ int askNumber(const string& prompt, int low, int high)
         int number;
         char extra;
         if (input >> number && !(input >> extra) &&
-            (number == 0 || (number >= low && number <= high)))
+            ((number >= low && number <= high) || (allowBack && number == 0)))
             return number;
 
-        cout << "Enter a whole number from " << low << " to " << high << ", or 0 to go back.\n";
+        cout << "Enter a whole number from " << low << " to " << high;
+        if (allowBack)
+            cout << ", or 0 to go back";
+        cout << ".\n";
     }
     return 0;
 }
@@ -207,8 +217,8 @@ string askName(const string& what)
     size_t first = name.find_first_not_of(" \t\r");
     if (first == string::npos)
         return "";
-    name.erase(name.find_last_not_of(" \t\r") + 1);
-    name.erase(0, first);
+    size_t last = name.find_last_not_of(" \t\r");
+    name = name.substr(first, last - first + 1);
     if (name == "0")
         return "";
     return name;
@@ -252,10 +262,11 @@ namespace
 {
 string fixtureKey(char type, int eventNumber, int matchNumber)
 {
+    // Saved events keep their order, so their numbers identify the fixtures on reopen.
     return string(1, type) + ":" + to_string(eventNumber) + ":" + to_string(matchNumber);
 }
 
-bool loadResults(Competition& event, char type, int eventNumber, const MatchHistory& history)
+bool restoreFixtureWinners(Competition& event, char type, int eventNumber, const MatchHistory& history)
 {
     // A saved match is the single record for the fixture, its stats and its prize.
     for (int i = 1; i <= static_cast<int>(event.matches().size()); i++)
@@ -275,25 +286,35 @@ bool loadResults(Competition& event, char type, int eventNumber, const MatchHist
     return true;
 }
 
-bool loadResults(Data& data, const MatchHistory& history)
+bool restoreWinners(Data& data, const MatchHistory& history)
 {
     for (int i = 0; i < static_cast<int>(data.leagues.size()); i++)
-        if (!loadResults(data.leagues[i], 'L', i + 1, history))
+        if (!restoreFixtureWinners(data.leagues[i], 'L', i + 1, history))
             return false;
     for (int i = 0; i < static_cast<int>(data.cups.size()); i++)
-        if (!loadResults(data.cups[i], 'T', i + 1, history))
+        if (!restoreFixtureWinners(data.cups[i], 'T', i + 1, history))
             return false;
     return true;
 }
 
-bool playFixture(Competition& event, int number, int score, int prize, const string& key,
-                 PlayerRecords& players, MatchHistory& history, bool demo = false)
+bool playFixture(Competition& event, int number, const string& key, int prize,
+                 const PlayerRecords& players, MatchHistory& history, int demoScore = 0)
 {
     const Fixture& match = event.matches()[number - 1];
-    if (match.winner != 0 || match.first == 0 || match.second == 0)
+    if (!match.canPlay())
     {
         cout << "Choose an unplayed fixture with two players.\n";
         return false;
+    }
+
+    int score = demoScore;
+    if (demoScore == 0)
+    {
+        cout << "1. Play 301\n2. Play 501\n0. Back\n";
+        int mode = askNumber("Choice: ", 1, 2);
+        if (mode == 0)
+            return false;
+        score = mode == 1 ? 301 : 501;
     }
     if (!players.isActive(match.first) || !players.isActive(match.second))
     {
@@ -304,7 +325,7 @@ bool playFixture(Competition& event, int number, int score, int prize, const str
     int ids[2] = {match.first, match.second};
     string names[2] = {players.name(ids[0]), players.name(ids[1])};
     MatchResult result{};
-    if (!playMatch(score, ids, names, 2, result, demo))
+    if (!playMatch(score, ids, names, 2, result, demoScore != 0))
         return false;
 
     if (!history.record(result, players, key, prize))
@@ -317,8 +338,7 @@ bool playFixture(Competition& event, int number, int score, int prize, const str
     return true;
 }
 
-void fixtureMenu(Competition& event, char type, int eventNumber, int prize,
-                 PlayerRecords& players, MatchHistory& history)
+bool showFixtures(const Competition& event, char type, const PlayerRecords& players)
 {
     cout << '\n' << event.getName() << '\n';
     const vector<Fixture>& matches = event.matches();
@@ -336,34 +356,30 @@ void fixtureMenu(Competition& event, char type, int eventNumber, int prize,
             cout << players.name(match.first) << " vs " << players.name(match.second);
             if (match.winner != 0)
                 cout << " | Winner: " << players.name(match.winner);
-            else
-                open = true;
         }
+        if (match.canPlay())
+            open = true;
         cout << '\n';
     }
 
     if (!open)
-    {
         cout << "All fixtures are complete.\n";
+    return open;
+}
+
+void fixtureMenu(Competition& event, char type, int eventNumber, int prize,
+                 const PlayerRecords& players, MatchHistory& history)
+{
+    if (!showFixtures(event, type, players))
         return;
-    }
-    int number = askNumber("Match to score (0 to go back): ", 1, matches.size());
+    int number = askNumber("Match to score (0 to go back): ", 1, event.matches().size());
     if (number == 0)
         return;
-    const Fixture& match = matches[number - 1];
-    if (match.first == 0 || match.second == 0 || match.winner != 0)
-    {
-        cout << "Choose an unplayed fixture with two players.\n";
-        return;
-    }
 
-    cout << "1. Play 301\n2. Play 501\n0. Back\n";
-    int mode = askNumber("Choice: ", 1, 2);
-    if (mode == 0)
-        return;
-    int finalPrize = type == 'T' && number == 3 ? prize : 0;
-    playFixture(event, number, mode == 1 ? 301 : 501, finalPrize,
-                fixtureKey(type, eventNumber, number), players, history);
+    // Leagues pass a zero prize. A tournament pays its prize only in fixture 3.
+    int finalPrize = number == 3 ? prize : 0;
+    playFixture(event, number, fixtureKey(type, eventNumber, number), finalPrize,
+                players, history);
 }
 
 bool leagueAction(Data& data, int choice, PlayerRecords& players, MatchHistory& history)
@@ -447,9 +463,9 @@ bool playDemoFixtures(Competition& event, char type, int prize,
     {
         if (event.matches()[number - 1].winner != 0)
             continue;
-        int finalPrize = type == 'T' && number == 3 ? prize : 0;
-        if (!playFixture(event, number, type == 'T' ? 501 : 301, finalPrize,
-                         fixtureKey(type, 1, number), players, history, true))
+        int finalPrize = number == 3 ? prize : 0;
+        if (!playFixture(event, number, fixtureKey(type, 1, number), finalPrize,
+                         players, history, type == 'T' ? 501 : 301))
             return false;
     }
     return true;
@@ -465,30 +481,31 @@ void competitionMenu(int choice, PlayerRecords& players, MatchHistory& history,
         cout << "Could not read " << file << ". Check the save file before continuing.\n";
         return;
     }
-    if (!loadResults(data, history))
+    if (!restoreWinners(data, history))
     {
         cout << "Saved match history does not match the competition fixtures.\n";
         return;
     }
+    string options;
+    int last;
+    if (choice == 5)
+    {
+        options = "\nCLUBS\n1. Create club\n2. Add member\n3. Remove member\n4. View club\n";
+        last = 4;
+    }
+    else if (choice == 6)
+    {
+        options = "\nLEAGUES\n1. Create league\n2. Fixtures and results\n3. View table\n";
+        last = 3;
+    }
+    else
+    {
+        options = "\nTOURNAMENTS\n1. Create tournament\n2. Draw and results\n";
+        last = 2;
+    }
+
     while (cin)
     {
-        string options;
-        int last;
-        if (choice == 5)
-        {
-            options = "\nCLUBS\n1. Create club\n2. Add member\n3. Remove member\n4. View club\n";
-            last = 4;
-        }
-        else if (choice == 6)
-        {
-            options = "\nLEAGUES\n1. Create league\n2. Fixtures and results\n3. View table\n";
-            last = 3;
-        }
-        else
-        {
-            options = "\nTOURNAMENTS\n1. Create tournament\n2. Draw and results\n";
-            last = 2;
-        }
         cout << options << "0. Back\n";
         int action = askNumber("Choice: ", 1, last);
         if (action == 0)
@@ -502,15 +519,14 @@ void competitionMenu(int choice, PlayerRecords& players, MatchHistory& history,
         else
             changed = tournamentAction(data, action, players, history, isAdmin);
 
-        if (changed)
+        if (!changed)
+            continue;
+        if (!saveData(data, file))
         {
-            if (!saveData(data, file))
-            {
-                cout << "Could not save this change. Check that the folder is writable.\n";
-                return;
-            }
-            cout << "Saved.\n";
+            cout << "Could not save this change. Check that the folder is writable.\n";
+            return;
         }
+        cout << "Saved.\n";
     }
 }
 
@@ -520,14 +536,6 @@ vector<Club> loadCompetitionClubs(const string& file)
     if (loadData(data, file))
         return data.clubs;
     return {};
-}
-
-string competitionClub(int playerId, const vector<Club>& clubs)
-{
-    for (const Club& club : clubs)
-        if (club.hasPlayer(playerId))
-            return club.getName();
-    return "-";
 }
 
 bool runCompetitionDemo(PlayerRecords& players, MatchHistory& history,
@@ -550,13 +558,13 @@ bool runCompetitionDemo(PlayerRecords& players, MatchHistory& history,
     if (!saveData(data, file))
         return false;
 
-    if (!loadResults(data, history) ||
+    if (!restoreWinners(data, history) ||
         !playDemoFixtures(data.leagues[0], 'L', 0, players, history) ||
         !playDemoFixtures(data.cups[0], 'T', data.cups[0].getPrize(), players, history))
         return false;
 
     data.leagues[0].showTable(data.clubs, players);
-    fixtureMenu(data.cups[0], 'T', 1, data.cups[0].getPrize(), players, history);
+    showFixtures(data.cups[0], 'T', players);
     showChampion(data.cups[0], players);
     return true;
 }

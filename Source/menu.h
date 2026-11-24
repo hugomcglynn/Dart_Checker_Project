@@ -1,5 +1,4 @@
-// Hugo McGlynn wrote the original menu declarations.
-// Codex updated them for the integrated app.
+// Original menu by Hugo McGlynn. App integration by Codex.
 
 //menu.h
 #ifndef MENU_H

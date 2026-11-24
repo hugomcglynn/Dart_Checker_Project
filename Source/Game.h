@@ -1,17 +1,18 @@
-// Hugo McGlynn is responsible for gameplay in the team plan.
-// Codex implemented this file using Hugo's original dart scoring.
+// Codex declared gameplay for Hugo McGlynn's part of the team plan.
 
 #ifndef GAME_H
 #define GAME_H
 
 #include <string>
 
+const int MAX_MATCH_PLAYERS = 8;
+
 struct MatchResult
 {
     int startingScore;
-    int playerIds[8];
-    int remaining[8];
-    int darts[8];
+    int playerIds[MAX_MATCH_PLAYERS];
+    int remaining[MAX_MATCH_PLAYERS];
+    int darts[MAX_MATCH_PLAYERS];
     int winnerId;
     int count;
 };

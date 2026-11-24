@@ -15,26 +15,25 @@ class PlayerRecords
 public:
     explicit PlayerRecords(const std::string& filename);
     bool load();
-    const Player* find(int id) const;
     bool isActive(int id) const;
-    int lastId() const;
+    std::vector<int> activeIds() const;
     std::string name(int id) const;
-    void listPlayers() const;
+    void listPlayers(bool includeInactive = false) const;
     int selectPlayer(bool allowCreate = false);
     int addPlayer(const std::string& name, int age, const std::string& nationality,
                   const std::string& address, const std::string& password);
 
     bool isAdmin() const;
-    int signedInPlayer() const;
     void accountMenu(const MatchHistory& history);
-    bool showProfile(int id) const;
 
 private:
-    enum class AccountRole { Guest, Player, Admin };
+    static const int ADMIN_SESSION = -1;
 
     bool save() const;
     int findIndex(int id) const;
-    void listProfiles() const;
+    const Player* find(int id) const;
+    int signedInPlayer() const;
+    bool showProfile(int id) const;
     int createPlayer();
     void signIn();
     bool authenticate(std::string& storedHash, bool& needsNewPassword, const std::string& label);
@@ -48,8 +47,7 @@ private:
     std::vector<Player> players;
     std::string adminHash;
     bool adminNeedsNewPassword = false;
-    int playerSession = 0;
-    AccountRole accountRole = AccountRole::Guest;
+    int signedInId = 0; // 0 is signed out. A positive value is a player ID.
 };
 
 #endif

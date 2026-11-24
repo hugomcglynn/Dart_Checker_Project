@@ -16,8 +16,8 @@ class Club
 {
 public:
     Club(std::string clubName);
-    void addPlayer(int playerId);
-    void removePlayer(int playerId);
+    bool addPlayer(int playerId);
+    bool removePlayer(int playerId);
     void displayClub(const PlayerRecords& players) const;
     bool hasPlayer(int playerId) const;
 
@@ -25,6 +25,7 @@ public:
     void save(std::ostream& out) const;
 
 private:
+    int memberIndex(int playerId) const;
     std::string name;
     int playerIds[MAX_CLUB_PLAYERS] = {};
     int playerCount = 0;

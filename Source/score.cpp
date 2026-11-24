@@ -1,36 +1,24 @@
-// Hugo McGlynn wrote the original single-dart scoring.
-// Brendan Galvin corrected the header filename in his patch.
-// Codex added visit scoring and double-out validation.
+// Hugo McGlynn wrote single-dart scoring. Brendan Galvin fixed the include.
+// Codex added visit scoring.
 
-//score.cpp
-#include <cctype>  //needed for toupper
 #include "score.h"
+#include <cctype>
 
-using namespace std;
-
-// Valid darts - 0 (miss), 1 - 20 with S/D/T, 25 (bullseye) with S or D only
+// The bull scores 25 or 50. A miss scores zero.
 bool isValidDart(int number, char multiplier)
 {
-    multiplier = toupper(multiplier);  // makes multiplier case insensitive
+    multiplier = std::toupper(static_cast<unsigned char>(multiplier));
 
-    if (multiplier != 'S' && multiplier != 'D' && multiplier != 'T') //have to have a multiplier selected
+    if (multiplier != 'S' && multiplier != 'D' && multiplier != 'T')
         return false;
-
-    if (number == 0 || (number >= 1 && number <= 20))  // because numbers on board go from 1 to 20 and 0 is a miss
+    if (number >= 0 && number <= 20)
         return true;
-
-    if (number == 25 && multiplier != 'T')   // because you cant get a triple bullseye
-        return true;
-
-    return false;
+    return number == 25 && multiplier != 'T';
 }
 
-// Calculate individual dart score
 int calculateDartScore(int number, char multiplier)
 {
-    multiplier = toupper(multiplier);
-
-    switch (multiplier)  // switches states for multiples
+    switch (std::toupper(static_cast<unsigned char>(multiplier)))
     {
         case 'D': return number * 2;
         case 'T': return number * 3;
@@ -38,21 +26,16 @@ int calculateDartScore(int number, char multiplier)
     }
 }
 
-
-// Checks remaining score on each dart so player finishes the game as
-// soon as they win
 DartResult applyDart(int& remScore, int dartScore, char multiplier)
 {
     int newScore = remScore - dartScore;
-    multiplier = toupper(multiplier);
+    multiplier = std::toupper(static_cast<unsigned char>(multiplier));
 
     if (newScore == 0 && multiplier == 'D')
     {
         remScore = 0;
         return WIN;
     }
-
-    // If score is below zero, left on 1, or hit 0 without a double player is bust
     if (newScore <= 1)
         return BUST;
 
@@ -60,80 +43,82 @@ DartResult applyDart(int& remScore, int dartScore, char multiplier)
     return CONTINUE;
 }
 
-namespace
-{
 const int MAX_DART_SCORE = 60;
-const int MAX_VISIT_SCORE = 3 * MAX_DART_SCORE;
 
-struct VisitScores
+static bool isDoubleScore(int score)
 {
-    bool totals[4][MAX_VISIT_SCORE + 1] = {};
-    bool doubles[MAX_DART_SCORE + 1] = {};
-    bool nonDoubles[MAX_DART_SCORE + 1] = {};
+    return score > 0 && score % 2 == 0 && isValidDart(score / 2, 'D');
+}
 
-    VisitScores()
+static bool isNonDoubleScore(int score)
+{
+    return isValidDart(score, 'S') || (score % 3 == 0 && isValidDart(score / 3, 'T'));
+}
+
+static bool isDartScore(int score)
+{
+    return isDoubleScore(score) || isNonDoubleScore(score);
+}
+
+static bool validVisitRange(int total, int darts)
+{
+    return darts >= 1 && darts <= 3 && total >= 0 && total <= darts * MAX_DART_SCORE;
+}
+
+// A visit has at most two darts before its last dart.
+static bool canScoreBeforeLast(int total, int darts)
+{
+    if (darts == 0)
+        return total == 0;
+    if (darts == 1)
+        return isDartScore(total);
+    if (total > 2 * MAX_DART_SCORE)
+        return false;
+
+    for (int first = 0; first <= MAX_DART_SCORE && first <= total; first++)
     {
-        const char multipliers[] = {'S', 'D', 'T'};
-        for (char multiplier : multipliers)
-        {
-            for (int number = 0; number <= 25; number++)
-            {
-                if (isValidDart(number, multiplier))
-                {
-                    int score = calculateDartScore(number, multiplier);
-                    if (multiplier == 'D' && score > 0)
-                        doubles[score] = true;
-                    else
-                        nonDoubles[score] = true;
-                }
-            }
-        }
-
-        totals[0][0] = true;
-        for (int darts = 1; darts <= 3; darts++)
-        {
-            for (int total = 0; total <= (darts - 1) * MAX_DART_SCORE; total++)
-            {
-                if (!totals[darts - 1][total])
-                    continue;
-                for (int score = 0; score <= MAX_DART_SCORE; score++)
-                {
-                    if (doubles[score] || nonDoubles[score])
-                        totals[darts][total + score] = true;
-                }
-            }
-        }
+        if (isDartScore(first) && isDartScore(total - first))
+            return true;
     }
-};
-
-const VisitScores visitScores;
+    return false;
 }
 
 bool isPossibleVisit(int total, int darts)
 {
-    return darts >= 1 && darts <= 3 && total >= 0 && total <= MAX_VISIT_SCORE &&
-           visitScores.totals[darts][total];
+    if (!validVisitRange(total, darts))
+        return false;
+
+    for (int last = 0; last <= MAX_DART_SCORE && last <= total; last++)
+    {
+        if (isDartScore(last) && canScoreBeforeLast(total - last, darts - 1))
+            return true;
+    }
+    return false;
 }
 
 bool isValidVisit(int remaining, int total, int darts, bool finishedOnDouble)
 {
-    if (!isPossibleVisit(total, darts) || (finishedOnDouble && total != remaining))
+    if (!validVisitRange(total, darts) || remaining < 2)
+        return false;
+    if (finishedOnDouble && total != remaining)
         return false;
     if (remaining - total > 1)
-        return true;
+        return isPossibleVisit(total, darts);
 
-    // The first darts must leave at least two, so the visit only ends on its last dart.
+    // Until the last dart there must still be at least two points left.
     for (int last = 0; last <= MAX_DART_SCORE && last <= total; last++)
     {
-        int earlierTotal = total - last;
-        if (remaining - earlierTotal < 2 || !visitScores.totals[darts - 1][earlierTotal])
+        int beforeLast = total - last;
+        if (remaining - beforeLast < 2)
             continue;
 
-        if (total != remaining && (visitScores.doubles[last] || visitScores.nonDoubles[last]))
-            return true;
-        if (total == remaining && finishedOnDouble && visitScores.doubles[last])
-            return true;
-        if (total == remaining && !finishedOnDouble && visitScores.nonDoubles[last])
+        bool lastDartIsLegal = isDartScore(last);
+        if (total == remaining && finishedOnDouble)
+            lastDartIsLegal = isDoubleScore(last);
+        if (total == remaining && !finishedOnDouble)
+            lastDartIsLegal = isNonDoubleScore(last);
+
+        if (lastDartIsLegal && canScoreBeforeLast(beforeLast, darts - 1))
             return true;
     }
     return false;
@@ -148,7 +133,7 @@ DartResult applyVisit(int& remaining, int total, bool finishedOnDouble)
         return WIN;
     }
 
-    // Cancel the whole visit on a bust, including earlier darts in the visit.
+    // A bust leaves the score unchanged for the whole visit.
     if (nextScore <= 1)
         return BUST;
 
